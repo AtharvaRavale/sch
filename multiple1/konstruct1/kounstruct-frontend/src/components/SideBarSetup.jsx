@@ -78,7 +78,7 @@ function SideBarSetup() {
             { name: "Users Management", path: "/UsersManagement" },
 
       { name: "Company Setup", path: "/user-setup" },
-      { name: "Scheduling", path: "/scheduling" },
+      // { name: "Scheduling", path: "/scheduling" },
 
       // { name: "Purpose Management", path: "/create-purpose" },
     ];

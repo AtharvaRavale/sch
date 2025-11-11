@@ -12,7 +12,6 @@ import {
   getProjectsByOwnership,
 } from "../api";
 
-const MAX_ASSIGNEES = 15;
 
 function useActiveProjectId() {
   try {
@@ -25,6 +24,14 @@ function useActiveProjectId() {
     localStorage.getItem("PROJECT_ID");
   return ls ? Number(ls) : null;
 }
+// put near other state hooks
+const MAX_REMIND_DAYS = 31;
+
+// days allowed = difference in days between start & end (non-negative), capped at 31
+
+
+// if current remind exceeds new max, clamp it
+
 
 const Scheduling = () => {
   // ---- Project selection (role-aware) ----
@@ -136,7 +143,18 @@ const Scheduling = () => {
   const [endDate, setEndDate] = useState("");
   const [remindDays, setRemindDays] = useState(0);
   const [assignees, setAssignees] = useState([]);
-
+const allowedRemindMax = React.useMemo(() => {
+  if (!startDate || !endDate) return 0;
+  const s = new Date(startDate + "T00:00:00");
+  const e = new Date(endDate + "T00:00:00");
+  const diff = Math.floor((e - s) / 86400000); // ms → days
+  return Math.max(0, Math.min(MAX_REMIND_DAYS, diff));
+}, [startDate, endDate]);
+useEffect(() => {
+  if (remindDays > allowedRemindMax) {
+    setRemindDays(allowedRemindMax);
+  }
+}, [allowedRemindMax, remindDays]);
   // selection state
   const [activeBuildingId, setActiveBuildingId] = useState(null);
   const [selectedBuildings, setSelectedBuildings] = useState(new Set());
@@ -262,6 +280,16 @@ const fetchActiveTab = async () => {
     });
   };
 
+
+
+
+
+
+
+
+
+
+  
   const selectAllFloorsForActiveBuilding = (checked) => {
     if (!activeBuilding) return;
     setSelectedFloorsByBuilding((prev) => {
@@ -345,8 +373,7 @@ const fetchActiveTab = async () => {
       return toast.error(
         "Please select at least one Floor (and Flats if needed)"
       );
-    if (assignees.length > MAX_ASSIGNEES)
-      return toast.error(`Max ${MAX_ASSIGNEES} assignees`);
+    
 
     const stageMeta = stageOptions.find(
       (s) => s.value === String(selectedStageId)
@@ -473,7 +500,7 @@ const fetchActiveTab = async () => {
                   </select>
                 </div>
 
-                {/* Start Date */}
+                {/* Start Date
                 <div className="flex flex-col">
                   <label className="text-sm font-medium mb-1">Start Date</label>
                   <input
@@ -482,10 +509,30 @@ const fetchActiveTab = async () => {
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
-                </div>
+                </div> */}
+                {/* Start Date */}
+<div className="flex flex-col">
+  <label className="text-sm font-medium mb-1">Start Date</label>
+  <input
+    type="date"
+    className="border rounded-md px-3 py-2"
+    value={startDate}
+    onChange={(e) => {
+      const val = e.target.value;
+      setStartDate(val);
+      // if end < new start, clear end & reset remind
+      if (endDate && new Date(endDate) < new Date(val)) {
+        setEndDate("");
+        setRemindDays(0);
+        toast.error("End Date cannot be before Start Date");
+      }
+    }}
+  />
+</div>
+
 
                 {/* End Date */}
-                <div className="flex flex-col">
+                {/* <div className="flex flex-col">
                   <label className="text-sm font-medium mb-1">End Date</label>
                   <input
                     type="date"
@@ -493,10 +540,29 @@ const fetchActiveTab = async () => {
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
-                </div>
+                </div> */}
+                {/* End Date */}
+<div className="flex flex-col">
+  <label className="text-sm font-medium mb-1">End Date</label>
+  <input
+    type="date"
+    className="border rounded-md px-3 py-2"
+    value={endDate}
+    min={startDate || undefined}  // ⬅️ blocks picking before start
+    onChange={(e) => {
+      const val = e.target.value;
+      if (startDate && new Date(val) < new Date(startDate)) {
+        toast.error("End Date cannot be before Start Date");
+        return;
+      }
+      setEndDate(val);
+    }}
+  />
+</div>
+
 
                 {/* Remind */}
-                <div className="flex flex-col">
+                {/* <div className="flex flex-col">
                   <label className="text-sm font-medium mb-1">
                     Remind Days Before
                   </label>
@@ -508,35 +574,41 @@ const fetchActiveTab = async () => {
                     value={remindDays}
                     onChange={(e) => setRemindDays(e.target.value)}
                   />
-                </div>
+                </div> */}
+                {/* Remind */}
+<div className="flex flex-col">
+  <label className="text-sm font-medium mb-1">
+    Remind Days Before
+    <span className="opacity-60"> (0–{allowedRemindMax})</span>
+  </label>
+  <select
+    className="border rounded-md px-3 py-2"
+    value={String(remindDays)}
+    disabled={!startDate || !endDate}   // need dates first
+    onChange={(e) => setRemindDays(Number(e.target.value))}
+  >
+    {Array.from({ length: allowedRemindMax + 1 }, (_, i) => (
+      <option key={i} value={i}>{i}</option>
+    ))}
+  </select>
+  <p className="text-xs opacity-70 mt-1">
+    Only within the selected date range (max {MAX_REMIND_DAYS}).
+  </p>
+</div>
+
 
                 {/* Assignees */}
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium mb-1">
-                    Assignees <span className="opacity-60">(up to {MAX_ASSIGNEES})</span>
-                  </label>
-                  <select
-                    multiple
-                    className="border rounded-md px-3 py-2 h-[42px]"
-                    value={assignees.map(String)}
-                    onChange={(e) => {
-                      const arr = Array.from(e.target.selectedOptions).map(
-                        (o) => o.value
-                      );
-                      if (arr.length > MAX_ASSIGNEES) {
-                        toast.error(`You can select at most ${MAX_ASSIGNEES}`);
-                        return;
-                      }
-                      setAssignees(arr.map(Number));
-                    }}
-                  >
-                    {users.map((u) => (
-                      <option key={u.user_id} value={u.user_id}>
-                        {u.name} ({(u.roles || []).join(", ")})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+               {/* Assignees */}
+<div className="flex flex-col">
+  <label className="text-sm font-medium mb-1">Assignees</label>
+  <AssigneeDropdown
+    users={users}
+    value={assignees}
+    onChange={(arr) => setAssignees(arr)}
+  />
+</div>
+
+
               </div>
 
               {/* 4 columns */}
@@ -807,5 +879,151 @@ function ScheduleListSmart({ data }) {
     </div>
   );
 }
+
+
+
+function AssigneeDropdown({ users = [], value = [], onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const [q, setQ] = React.useState("");
+  const ref = React.useRef(null);
+
+  // close on outside click
+  React.useEffect(() => {
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const filtered = React.useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return users;
+    return users.filter((u) => {
+      const roles = Array.isArray(u.roles) ? u.roles.join(", ") : "";
+      return (
+        (u.name || "").toLowerCase().includes(needle) ||
+        String(u.user_id).includes(needle) ||
+        roles.toLowerCase().includes(needle)
+      );
+    });
+  }, [users, q]);
+
+  const filteredIds = React.useMemo(
+    () => filtered.map((u) => Number(u.user_id)),
+    [filtered]
+  );
+  const allFilteredSelected =
+    filteredIds.length > 0 &&
+    filteredIds.every((id) => value.includes(Number(id)));
+
+  const toggle = (id) => {
+    const idN = Number(id);
+    const has = value.includes(idN);
+    if (has) onChange(value.filter((v) => v !== idN));
+    else onChange([...value, idN]);
+  };
+
+  const selectAllFiltered = () => {
+    if (allFilteredSelected) {
+      // unselect all currently filtered
+      onChange(value.filter((v) => !filteredIds.includes(Number(v))));
+    } else {
+      // add all filtered
+      const merged = new Set([...value, ...filteredIds]);
+      onChange(Array.from(merged));
+    }
+  };
+
+  const clearAll = () => onChange([]);
+
+  const summary = React.useMemo(() => {
+    if (!value.length) return "Select assignees…";
+    const names = users
+      .filter((u) => value.includes(Number(u.user_id)))
+      .map((u) => u.name);
+    if (names.length <= 2) return names.join(", ");
+    return `${names.slice(0, 2).join(", ")} +${names.length - 2} more`;
+  }, [users, value]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full border rounded-md px-3 py-2 text-left flex items-center justify-between hover:bg-purple-50"
+      >
+        <span className={`${value.length ? "" : "opacity-60"}`}>{summary}</span>
+        <svg className="w-4 h-4 opacity-60" viewBox="0 0 20 20" fill="currentColor"><path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z"/></svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-[1100] mt-1 w-full bg-white border rounded-md shadow-xl">
+          <div className="p-2 border-b flex items-center gap-2">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search name/role…"
+              className="w-full border rounded px-2 py-1 text-sm"
+            />
+            <button
+              type="button"
+              onClick={selectAllFiltered}
+              className="text-xs px-2 py-1 rounded border hover:bg-purple-50"
+            >
+              {allFilteredSelected ? "Unselect filtered" : "Select all"}
+            </button>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-xs px-2 py-1 rounded border hover:bg-purple-50"
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="max-h-64 overflow-auto py-1">
+            {filtered.length === 0 && (
+              <div className="px-3 py-2 text-sm opacity-60">No matches</div>
+            )}
+            {filtered.map((u) => {
+              const idN = Number(u.user_id);
+              const checked = value.includes(idN);
+              const roles = Array.isArray(u.roles) ? u.roles.join(", ") : "";
+              return (
+                <label
+                  key={idN}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-purple-50 ${
+                    checked ? "bg-purple-50" : ""
+                  }`}
+                  onClick={() => toggle(idN)}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={checked}
+                    onChange={() => {}}
+                  />
+                  <span className="flex-1">
+                    {u.name}{" "}
+                    <span className="opacity-60">
+                      {roles ? `(${roles})` : ""}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="p-2 border-t text-xs opacity-70">
+            Selected: {value.length} / {users.length}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 export default Scheduling;
