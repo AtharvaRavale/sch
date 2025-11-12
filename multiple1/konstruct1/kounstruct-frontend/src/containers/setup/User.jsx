@@ -3320,6 +3320,7 @@ function User() {
 
 
 
+
 //newly added
 // New states for Manager dropdowns
   const [purposes, setPurposes] = useState([]);
@@ -3330,7 +3331,7 @@ function User() {
 
   const [selectedPurpose, setSelectedPurpose] = useState("");
   const [selectedPhase, setSelectedPhase] = useState("");
-  const [selectedStage, setSelectedStage] = useState([]);
+  const [selectedStage, setSelectedStage] = useState("");
 
 
 
@@ -3470,7 +3471,8 @@ const handleStageChange = (e) => {
   });
   const isInitializer = (userDataForm.role || "").toUpperCase() === "INTIALIZER";
   
-
+const ROLE = (userDataForm.role || "").toUpperCase();
+const isSecurityGuard = ROLE === "SECURITY_GUARD";
 
   const [selectedOrganization, setSelectedOrganization] = useState("");
   const [selectedCompany, setSelectedCompany] = useState("");
@@ -3500,7 +3502,7 @@ const handleStageChange = (e) => {
   const [availableLevel4, setAvailableLevel4] = useState([]);
   const [availableLevel5, setAvailableLevel5] = useState([]);
   const [availableLevel6, setAvailableLevel6] = useState([]);
-  const showCategoryUI = canCreateNormalUser && selectedProject && !isInitializer;
+  const showCategoryUI = canCreateNormalUser && selectedProject && !isInitializer && !isSecurityGuard;
 
 
   const resetCategorySelections = useCallback(() => {
@@ -3578,11 +3580,21 @@ const handleStageChange = (e) => {
         { value: "SUPERVISOR", label: "SUPERVISOR" },
         { value: "CHECKER", label: "CHECKER" },
         { value: "MAKER", label: "MAKER" },
-        { value: "Intializer", label: "Intializer" },
+        { value: "SECURITY_GUARD", label: "SECURITY GUARD" },
+        
+        { value: "Intializer", label: "INITIALIZER" },
       ];
     }
     return [];
   }, [canCreateClient, canCreateManager, canCreateNormalUser]);
+
+
+  useEffect(() => {
+  if (isSecurityGuard) {
+    setAllCat(false);
+    resetCategorySelections();
+  }
+}, [isSecurityGuard, resetCategorySelections]);
 
   const fetchOrgInfo = useCallback(async () => {
     if (!userId) {
@@ -3963,7 +3975,7 @@ const handleProjectChange = useCallback(
   if (canCreateNormalUser) {
     // role must be chosen; category required unless "Intializer" OR "select all"
     const hasRole = !!userDataForm.role;
-    const categoryOk = isInitializer || allCat || !!selectedCategory;
+    const categoryOk = isInitializer|| isSecurityGuard || allCat || !!selectedCategory;
     return basicFields && hasRole && categoryOk;
   }
 
@@ -4099,7 +4111,6 @@ const handleProjectChange = useCallback(
       setIsSubmitting(false);
       return;
     }
-    const showCategoryUI = canCreateNormalUser && selectedProject && !isInitializer;
 
 
     // For manager and normal users

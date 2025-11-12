@@ -1034,3 +1034,171 @@ export const getSchedulingSetup = (project_id) =>
   projectInstance.get("/v2/scheduling/setup/", {
     params: { project_id }, // -> ?project_id=36
   });
+
+
+
+
+
+
+
+
+
+
+//   /* ========= GUARD: STAFF & ATTENDANCE (v2) ========= */
+
+// // 1) List STAFF for a project (search optional)
+// // GET /v2/staff/?project_id=36[&q=raj]
+// export const getStaffByProject = (projectId, q = "") =>
+//   axiosInstance.get("/v2/staff/", {
+//     params: { project_id: projectId, q },
+//     headers: { "Content-Type": "application/json" },
+//   });
+
+// // 2) Onboard a STAFF (face template created server-side)
+// // POST /v2/staffs/onboard/  (multipart/form-data)
+// export const onboardStaff = ({
+//   project_id,
+//   first_name,
+//   last_name = "",
+//   phone_number,
+//   adharcard_nummber = "",
+//   photo, // File/Blob
+// }) => {
+//   const fd = new FormData();
+//   fd.append("project_id", project_id);
+//   fd.append("first_name", first_name);
+//   if (last_name) fd.append("last_name", last_name);
+//   fd.append("phone_number", phone_number);
+//   if (adharcard_nummber) fd.append("adharcard_nummber", adharcard_nummber);
+//   fd.append("photo", photo);
+//   return axiosInstance.post("/v2/staffs/onboard/", fd, {
+//     headers: { "Content-Type": "multipart/form-data" },
+//   });
+// };
+
+// // 3) Mark attendance (auto IN/OUT unless force_action provided)
+// // POST /v2/attendance/mark/  (multipart/form-data)
+// export const markAttendance = ({
+//   user_id,
+//   project_id,
+//   photo,                // File/Blob
+//   lat = null,
+//   lon = null,
+//   force_action = null,  // "IN" | "OUT" | null
+// }) => {
+//   const fd = new FormData();
+//   fd.append("user_id", user_id);
+//   fd.append("project_id", project_id);
+//   fd.append("photo", photo);
+//   if (lat != null && lon != null) {
+//     fd.append("lat", lat);
+//     fd.append("lon", lon);
+//   }
+//   if (force_action) fd.append("force_action", force_action);
+//   return axiosInstance.post("/v2/attendance/mark/", fd, {
+//     headers: { "Content-Type": "multipart/form-data" },
+//   });
+// };
+
+// // 4) List attendance for a user (by day or range)
+// // GET /v2/attendance/?user_id=&project_id=&date=YYYY-MM-DD
+// // or  /v2/attendance/?user_id=&project_id=&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+// export const listAttendanceByUser = ({
+//   user_id,
+//   project_id,
+//   date,        // optional
+//   start_date,  // optional (use with end_date)
+//   end_date,    // optional
+// }) =>
+//   axiosInstance.get("/v2/attendance/", {
+//     params: { user_id, project_id, date, start_date, end_date },
+//     headers: { "Content-Type": "application/json" },
+//   });
+
+
+
+/* ========= GUARD: STAFF & ATTENDANCE (v2) ========= */
+
+// 1) GET /v2/staff/?project_id=36[&q=raj]
+export const getStaffByProject = (projectId, q = "") =>
+  axiosInstance.get("/v2/staff/", {
+    params: { project_id: projectId, q },   // if your API expects `search`, swap to { project_id, search: q }
+    headers: { "Content-Type": "application/json" },
+  });
+
+// 2) POST /v2/staffs/onboard/  (multipart)
+// api.js
+export const onboardStaff = ({
+  project_id,
+  username,                 // NEW
+  first_name,
+  last_name = "",
+  phone_number,
+  adharcard_nummber = "",   // keep backend’s exact field name
+  photo,                    // File/Blob
+}) => {
+  const fd = new FormData();
+  fd.append("project_id", String(project_id));
+  if (username && username.trim()) fd.append("username", username.trim()); // NEW
+  fd.append("first_name", first_name.trim());
+  if (last_name) fd.append("last_name", last_name.trim());
+  fd.append("phone_number", phone_number.trim());
+  if (adharcard_nummber) fd.append("adharcard_nummber", adharcard_nummber);
+
+  if (photo) {
+    // include a filename so Django/DRF saves with an extension
+    const filename = typeof photo.name === "string" ? photo.name : "photo.jpg";
+    fd.append("photo", photo, filename);
+  }
+
+  // Let Axios set the correct multipart boundary automatically
+  return axiosInstance.post("/v2/staffs/onboard/", fd);
+};
+
+// export const onboardStaff = ({
+//   project_id,
+//   first_name,
+//   last_name = "",
+//   phone_number,
+//   adharcard_nummber = "",   // keep backend’s exact field name
+//   photo,                    // File/Blob
+// }) => {
+//   const fd = new FormData();
+//   fd.append("project_id", project_id);
+//   fd.append("first_name", first_name);
+//   if (last_name) fd.append("last_name", last_name);
+//   fd.append("phone_number", phone_number);
+//   if (adharcard_nummber) fd.append("adharcard_nummber", adharcard_nummber);
+//   fd.append("photo", photo);
+//   return axiosInstance.post("/v2/staffs/onboard/", fd, {
+//     headers: { "Content-Type": "multipart/form-data" },
+//   });
+// };
+
+// 3) POST /v2/attendance/mark/  (multipart)
+export const markAttendance = ({
+  user_id,
+  project_id,
+  photo,                 // File/Blob
+  lat = null,
+  lon = null,
+  force_action = null,   // "IN" | "OUT" | null
+}) => {
+  const fd = new FormData();
+  fd.append("user_id", user_id);
+  fd.append("project_id", project_id);
+  fd.append("photo", photo);
+  if (lat != null && lon != null) { fd.append("lat", lat); fd.append("lon", lon); }
+  if (force_action) fd.append("force_action", force_action);
+  return axiosInstance.post("/v2/attendance/mark/", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
+// 4) GET /v2/attendance/?user_id=&project_id=&date=YYYY-MM-DD
+// or use start_date & end_date
+export const listAttendanceByUser = ({ user_id, project_id, date, start_date, end_date }) =>
+  axiosInstance.get("/v2/attendance/", {
+    params: { user_id, project_id, date, start_date, end_date },
+    headers: { "Content-Type": "application/json" },
+  });

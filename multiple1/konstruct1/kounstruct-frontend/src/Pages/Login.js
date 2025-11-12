@@ -38,6 +38,24 @@ function getDisplayRole(userData) {
   return "User";
 }
 
+function hasSecurityGuardRole(data) {
+   if (!data) return false;
+   const norm = (s) => String(s || "").trim().toUpperCase();
+   const roles = new Set();
+   // token top-level single role
+   if (data.role) roles.add(norm(data.role));
+   // token/user top-level roles[]
+   (data.roles || []).forEach(r => roles.add(norm(typeof r === "string" ? r : r?.role)));
+   // per-access roles
+   (data.accesses || []).forEach(a =>
+     (a.roles || []).forEach(r => roles.add(norm(typeof r === "string" ? r : r?.role)))
+   );
+   // treat these as "security guard" — include "STAFF" only if you want staff to land on guard pages
+   const guardSynonyms = new Set(["SECURITY_GUARD","SECURITY GUARD","GUARD"]);
+   return [...roles].some(r => guardSynonyms.has(r));
+ }
+
+
 
 const Login = () => {
   const navigate = useNavigate();
@@ -115,8 +133,12 @@ const Login = () => {
           JSON.stringify(tokenData.accesses || [])
         );
       }
-      navigate("/config");
-      toast.success("You are already logged in!");
+ if (hasSecurityGuardRole(tokenData)) {
+   navigate("/guard/onboarding");
+ } else {
+   navigate("/config");
+ }
+           toast.success("You are already logged in!");
     }
   }, [navigate, dispatch]);
 
@@ -185,7 +207,13 @@ const Login = () => {
         }
 
         toast.success("Logged in successfully!");
-        navigate("/config");
+        if (hasSecurityGuardRole(userData || tokenData)) {
+   navigate("/guard/onboarding");
+ } else {
+   navigate("/config");
+ }
+
+
       } else {
         toast.error("Invalid credentials.");
       }

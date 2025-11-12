@@ -173,6 +173,8 @@ import HierarchicalVerifications from "./components/HierarchicalVerifications";
 import FlatInspectionPage from "./components/FlatInspectionPage";
 import PrivacyPage from "./components/PrivacyPage";
 import Scheduling from "./components/Scheduling";
+import GuardOnboarding from "./components/GuardOnboarding";
+import GuardAttendance from "./components/GuardAttendance";
 
 
 // For body background
@@ -239,6 +241,11 @@ function AppRoutes() {
           path="/Pending-For-MakerItems"
           element={<PendingForMakerItems />}
         />
+        <Route path="/guard/onboarding" element={<GuardOnboarding />} />
+        <Route path="/guard/attendance" element={<GuardAttendance />} />
+
+
+
         <Route path="/chif-setup" element={<ChifSetup />} />
         <Route path="/Chifstep1" element={<Chifstep1 />} />
         <Route path="/Checklist" element={<Checklist />} />

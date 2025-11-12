@@ -5,7 +5,8 @@ import { useSidebar } from "./SidebarContext"; // <-- important
 
 const ORANGE = "#ffbe63";
 const BG_OFFWHITE = "#fcfaf7";
-const SIDEBAR_WIDTH = 240; // px
+// const SIDEBAR_WIDTH = 240; // px
+export const SIDEBAR_WIDTH = 240;
 
 function getAllRoles() {
   const userString = localStorage.getItem("USER_DATA");
@@ -39,19 +40,42 @@ function getAllRoles() {
   }
 }
 
-function SideBarSetup() {
+// function SideBarSetup() {
+
+function SideBarSetup({ overrideNavItems }) {
   const { theme } = useTheme();
   const { sidebarOpen } = useSidebar(); // <-- important!
   const allRoles = getAllRoles();
+  
   const rolee = (localStorage.getItem("ROLE") || "").toLowerCase();
+  const rolesLower = allRoles.map(r => String(r).toLowerCase());
+  const isGuard = rolesLower.includes("security_guard") || rolesLower.includes("security guard");  const isSecurityGuard = allRoles.some(r => String(r).toUpperCase() === "SECURITY_GUARD");
 
-  const isInitializer = allRoles.some(
-    (r) => r === "Intializer" || r === "Initializer"
+  // const isInitializer = allRoles.some(
+  //   (r) => r === "Intializer" || r === "Initializer"
+  // );
+  // if (isInitializer) return null;
+
+  const isInit = allRoles.some(
+    (r) => String(r).toLowerCase() === "initializer" || String(r).toLowerCase() === "intializer"
   );
-  if (isInitializer) return null;
+  const hasOtherRole = allRoles.some(
+    (r) => !["initializer", "intializer"].includes(String(r).toLowerCase())
+  );
+  // hide only if initializer is the **only** role
+  if (isInit && !hasOtherRole) return null;
 
-  let navItems;
-  if (rolee === "manager") {
+  // let navItems;
+  let navItems = Array.isArray(overrideNavItems) && overrideNavItems.length
+    ? overrideNavItems
+    : undefined;
+  // if (isGuard) {
+  if (isGuard) {
+   navItems = [
+     { name: "Onboarding", path: "/guard/onboarding" },
+     { name: "Attendance", path: "/guard/attendance" },
+   ];
+ } else if (rolee === "manager") {
     navItems = [
       { name: "User & Role", path: "/user" },
       { name: "Checklist", path: "/Checklist" },
@@ -105,6 +129,7 @@ function SideBarSetup() {
         transition: "transform 0.35s cubic-bezier(.6,-0.17,.22,1.08)",
       }}
     >
+      
       <div className="mb-6 text-center mt-4">
         <div
           className="text-lg font-bold tracking-wide"
@@ -117,6 +142,7 @@ function SideBarSetup() {
           Admin Panel
         </div>
       </div>
+
       <nav className="space-y-2 flex-1 px-2">
         {navItems.map((item) => (
           <NavLink

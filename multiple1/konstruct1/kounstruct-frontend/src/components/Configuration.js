@@ -1892,7 +1892,7 @@ const ScheduleCard = ({ row, cardColor, textColor, borderColor }) => {
       </div>
 
       {/* Right: actions */}
-      <div className="sm:ml-auto flex items-center gap-2">
+      {/* <div className="sm:ml-auto flex items-center gap-2">
         <button
           className="px-3 py-1.5 rounded-lg text-sm font-semibold border"
           style={{
@@ -1907,7 +1907,7 @@ const ScheduleCard = ({ row, cardColor, textColor, borderColor }) => {
         >
           Reject
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };
