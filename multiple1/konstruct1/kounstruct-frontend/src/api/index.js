@@ -1202,3 +1202,51 @@ export const listAttendanceByUser = ({ user_id, project_id, date, start_date, en
     params: { user_id, project_id, date, start_date, end_date },
     headers: { "Content-Type": "application/json" },
   });
+
+
+
+
+
+
+
+
+  // ---- ANALYTICS: Snag stats ----
+// GET https://konstruct.world/checklists/stats/snags/?project_id=...
+// export const getSnagStats = (project_id, extraParams = {}) =>
+//   projectInstance.get("/checklists/stats/snags/", {
+//     params: { project_id, ...extraParams }, // accepts optional phase_id, stage_id, date range, etc.
+//   });
+
+// // Small helper so both Header and pages resolve project id the same way
+// export const resolveActiveProjectId = () => {
+//   try {
+//     const qp = new URLSearchParams(window.location.search).get("project_id");
+//     if (qp) return Number(qp);
+//   } catch {}
+//   const ls =
+//     localStorage.getItem("ACTIVE_PROJECT_ID") ||
+//     localStorage.getItem("PROJECT_ID");
+//   return Number(ls) || null; // no hardcoded fallback
+// };
+
+
+// ---- ANALYTICS: Snag stats (Checklist service) ----
+// If NEWchecklistInstance baseURL is the domain root, keep the leading "/checklists" below.
+// If its baseURL already includes "/checklists", change the path to just "/stats/snags/".
+
+export const getSnagStats = (project_id, extraParams = {}) =>
+  NEWchecklistInstance.get("/stats/snags/", {
+    params: { project_id, ...extraParams },
+  });
+
+// Helper so Header and Analytics page resolve project consistently
+export const resolveActiveProjectId = () => {
+  try {
+    const qp = new URLSearchParams(window.location.search).get("project_id");
+    if (qp) return Number(qp);
+  } catch {}
+  const ls =
+    localStorage.getItem("ACTIVE_PROJECT_ID") ||
+    localStorage.getItem("PROJECT_ID");
+  return Number(ls) || null;
+};
