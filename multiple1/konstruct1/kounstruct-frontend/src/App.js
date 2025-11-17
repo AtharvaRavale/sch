@@ -175,6 +175,8 @@ import PrivacyPage from "./components/PrivacyPage";
 import Scheduling from "./components/Scheduling";
 import GuardOnboarding from "./components/GuardOnboarding";
 import GuardAttendance from "./components/GuardAttendance";
+import AttendanceProjectPage from "./components/AttendanceProjectPage";
+
 
 
 // For body background
@@ -231,6 +233,11 @@ function AppRoutes() {
           path="/PendingSupervisorItems"
           element={<PendingSupervisorItems />}
         />
+        <Route
+  path="/attendance/project"
+  element={<AttendanceProjectPage />}
+/>
+
         <Route path="/UsersManagement" element={<UsersManagement />} />
         <Route path="/Initialize-Checklist" element={<InitializeChecklist />} />
         <Route

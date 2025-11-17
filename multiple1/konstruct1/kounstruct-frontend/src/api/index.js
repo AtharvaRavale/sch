@@ -87,7 +87,7 @@ export const allorgantioninfototalbyUser_id = async (id) =>
   });
 
 export const getUserDetailsById = async (id) =>
-  axiosInstance.get(`/users/${id}`, {
+  axiosInstance.get(`users/${id}`, {
     headers: {
       "Content-Type": "application/json",
     },
@@ -1249,4 +1249,25 @@ export const resolveActiveProjectId = () => {
     localStorage.getItem("ACTIVE_PROJECT_ID") ||
     localStorage.getItem("PROJECT_ID");
   return Number(ls) || null;
+};
+
+
+
+
+
+
+// ==== FACE TEMPLATE (image enroll) ====
+// POST /v2/face/enroll/  (multipart/form-data)
+// Use replace=true to overwrite existing templates; omit/false to append.
+export const enrollFaceTemplate = ({ user_id, photo, replace = false }) => {
+  const fd = new FormData();
+  fd.append("user_id", String(user_id));
+  if (photo) {
+    const filename = typeof photo?.name === "string" ? photo.name : "face.jpg";
+    fd.append("photo", photo, filename);
+  }
+  if (replace) fd.append("replace", "true"); // backend treats presence as true
+
+  // Let Axios set multipart boundary automatically
+  return axiosInstance.post("/v2/face/enroll/", fd);
 };

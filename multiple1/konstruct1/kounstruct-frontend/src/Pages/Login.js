@@ -9,7 +9,7 @@ import "react-toastify/dist/ReactToastify.css";
 import Bg1 from "../Images/image.jpg";
 import Bg2 from "../Images/image1.jpg";
 import Bg3 from "../Images/image2.jpg";
-
+import { getUserDetailsById } from "../api";
 // Carousel Config
 const BG_IMAGES = [Bg1, Bg2, Bg3];
 const BG_INTERVAL = 7000;
@@ -70,6 +70,46 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [bgIndex, setBgIndex] = useState(0);
+   // --- Avatar cache helpers ---
+ const BASE = "https://konstruct.world";
+ const AVATAR_URL_KEY = (id) => `USER_AVATAR_URL_${id}`;
+ const AVATAR_B64_KEY = (id) => `USER_AVATAR_DATAURL_${id}`;
+ const toAbsolute = (u) =>
+   !u ? "" : /^https?:\/\//i.test(u) ? u : `${BASE}${u.startsWith("/") ? "" : "/"}${u}`;
+  const cacheBust = (url) => (url ? `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}` : url);
+ const blobToDataURL = (blob) =>
+   new Promise((res) => {
+     const fr = new FileReader();
+     fr.onload = () => res(fr.result);
+     fr.readAsDataURL(blob);
+   });
+ async function safeFetchToDataURL(url) {
+   try {
+     const resp = await fetch(url, { mode: "cors", credentials: "include" });
+     if (!resp.ok) return null;
+     const blob = await resp.blob();
+     return await blobToDataURL(blob);
+   } catch {
+     return null;
+   }
+ }
+ async function cacheAvatarForUser(user) {
+   const userId = String(user?.user_id || user?.id || "");
+   if (!userId) return user;
+   const raw = user?.profile_image || user?.photo || "";
+   const abs = toAbsolute(raw);
+   const finalUrl = abs ? cacheBust(abs) : null;
+   if (finalUrl) localStorage.setItem(AVATAR_URL_KEY(userId), finalUrl);
+   // Best effort base64 (CORS may block; that's OK)
+   const b64 = abs ? await safeFetchToDataURL(abs) : null;
+   if (b64) localStorage.setItem(AVATAR_B64_KEY(userId), b64);
+   const merged = finalUrl ? { ...user, profile_image: finalUrl, photo: finalUrl } : user;
+   localStorage.setItem("USER_DATA", JSON.stringify(merged));
+   return merged;
+ }
+
+ 
+
 
   // Carousel logic
   useEffect(() => {
@@ -199,12 +239,26 @@ const Login = () => {
           };
         }
 
-        if (userData) {
-          dispatch(setUserData(userData));
-          localStorage.setItem("USER_DATA", JSON.stringify(userData));
-          // --- SET ALL ROLES ---
-          localStorage.setItem("ROLE", getDisplayRole(userData));
+        // if (userData) {
+        //   dispatch(setUserData(userData));
+        //   localStorage.setItem("USER_DATA", JSON.stringify(userData));
+        //   // --- SET ALL ROLES ---
+        //   localStorage.setItem("ROLE", getDisplayRole(userData));
+        // }
+        if (!userData && tokenData?.user_id) {
+          try {
+            const res = await getUserDetailsById(tokenData.user_id);
+            userData = res?.data || null;
+         } catch {}
         }
+
+      if (userData) {
+  // cache avatar URL (+ cache-bust) and a base64 fallback, then persist USER_DATA
+  userData = await cacheAvatarForUser(userData);
+
+  dispatch(setUserData(userData));
+  localStorage.setItem("ROLE", getDisplayRole(userData));
+}
 
         toast.success("Logged in successfully!");
         if (hasSecurityGuardRole(userData || tokenData)) {
