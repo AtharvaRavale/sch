@@ -7,6 +7,8 @@ import {
 } from "./axiosInstance";
 import { organnizationInstance } from "./axiosInstance"
 
+const __isLoggingOut = () => localStorage.getItem("__LOGGING_OUT__") === "1";
+const __hasAccess = () => !!localStorage.getItem("ACCESS_TOKEN");
 
 export const login = async (data) =>
   axiosInstance.post("/token/", data, {
@@ -671,7 +673,7 @@ export const getProjectsByOwnership = async ({ entity_id, company_id, organizati
   if (entity_id) query = `entity_id=${entity_id}`;
   else if (company_id) query = `company_id=${company_id}`;
   else if (organization_id) query = `organization_id=${organization_id}`;
-
+if (!__hasAccess() || __isLoggingOut()) return { data: [] };
   return projectInstance.get(
     `/projects/by_ownership/?${query}`,
     {
@@ -685,6 +687,7 @@ export const getProjectsByOwnership = async ({ entity_id, company_id, organizati
 
 
 export const getProjectsByOrganization = async (organizationId) =>
+  
   projectInstance.get(`/projects/by_organization/${organizationId}/`, {
     headers: {
       "Content-Type": "application/json",
@@ -992,6 +995,8 @@ export const getProjectsForCurrentUser = async () => {
   const user = userStr && userStr !== "undefined" ? JSON.parse(userStr) : null;
 
   if (!user) return { data: [] };
+  if (!__hasAccess() || __isLoggingOut()) return { data: [] };
+
 
   if (role === "super admin") return Allprojects(); // /projects/
   if (role === "admin" || role === "manager") return getProjectUserDetails(); // /user-stage-role/get-projects-by-user/
@@ -1008,7 +1013,9 @@ export const getProjectsForCurrentUser = async () => {
 
 // api.js
 export const getProjectsByOrgOwnership = async (organizationId) =>
+  
   projectInstance.get(`/projects/by_ownership/`, {
+    
     params: { organization_id: organizationId },   // -> https://konstruct.world/projects/projects/by_ownership/?organization_id=141
     headers: { "Content-Type": "application/json" },
   });
@@ -1024,11 +1031,11 @@ export const getProjectsByOrgOwnership = async (organizationId) =>
 // });
 
 // (optional) auth header
-projectInstance.interceptors.request.use((cfg) => {
-  const token = localStorage.getItem("ACCESS_TOKEN") || localStorage.getItem("access");
-  if (token) cfg.headers.Authorization = `Bearer ${token}`;
-  return cfg;
-});
+// projectInstance.interceptors.request.use((cfg) => {
+//   const token = localStorage.getItem("ACCESS_TOKEN") || localStorage.getItem("access");
+//   if (token) cfg.headers.Authorization = `Bearer ${token}`;
+//   return cfg;
+// });
 
 export const getSchedulingSetup = (project_id) =>
   projectInstance.get("/v2/scheduling/setup/", {

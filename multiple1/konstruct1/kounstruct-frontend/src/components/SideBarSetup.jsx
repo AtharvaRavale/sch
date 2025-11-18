@@ -269,7 +269,7 @@ function SideBarSetup({ overrideNavItems }) {
       { name: "Category management", path: "/category-sidebar" },
       { name: "Users Management", path: "/UsersManagement" },
       { name: "Scheduling", path: "/scheduling" },
-      { name: "Attendance", path: attendanceProjectPath }, // ✅ use computed path
+      { name: "Attendance", path: "/attendance/project" }, // ✅ use computed path
     ];
   } else if (rolee === "super admin") {
     navItems = [
@@ -277,14 +277,14 @@ function SideBarSetup({ overrideNavItems }) {
       { name: "Unit Setup", path: "/setup" },
       { name: "User & Role", path: "/user" },
       { name: "Users Management", path: "/UsersManagement" },
-      { name: "Attendance", path: attendanceProjectPath }, // ✅
+      // { name: "Attendance", path: attendanceProjectPath }, // ✅
       { name: "Purpose Management", path: "/create-purpose" },
     ];
   } else {
     navItems = [
       { name: "User & Role", path: "/user" },
       { name: "Users Management", path: "/UsersManagement" },
-      { name: "Attendance", path: attendanceProjectPath }, // ✅
+      // { name: "Attendance", path: attendanceProjectPath }, // ✅
       { name: "Company Setup", path: "/user-setup" },
     ];
   }

@@ -10,6 +10,8 @@ import Bg1 from "../Images/image.jpg";
 import Bg2 from "../Images/image1.jpg";
 import Bg3 from "../Images/image2.jpg";
 import { getUserDetailsById } from "../api";
+import { setLoggingOut } from "../api/axiosInstance";
+
 // Carousel Config
 const BG_IMAGES = [Bg1, Bg2, Bg3];
 const BG_INTERVAL = 7000;
@@ -77,13 +79,43 @@ const Login = () => {
  const toAbsolute = (u) =>
    !u ? "" : /^https?:\/\//i.test(u) ? u : `${BASE}${u.startsWith("/") ? "" : "/"}${u}`;
   const cacheBust = (url) => (url ? `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}` : url);
- const blobToDataURL = (blob) =>
+
+const blobToDataURL = (blob) =>
    new Promise((res) => {
      const fr = new FileReader();
      fr.onload = () => res(fr.result);
      fr.readAsDataURL(blob);
    });
+useEffect(() => {
+  setLoggingOut(false); // we’ve arrived at /login; allow requests again
+}, []);
+
+
+
+//  const blobToDataURL = (blob) =>
+//    new Promise((res) => {
+//      const fr = new FileReader();
+//      fr.onload = () => res(fr.result);
+//      fr.readAsDataURL(blob);
+//    });
+//  async function safeFetchToDataURL(url) {
+//    try {
+//      const resp = await fetch(url, { mode: "cors", credentials: "include" });
+//      if (!resp.ok) return null;
+//      const blob = await resp.blob();
+//      return await blobToDataURL(blob);
+//    } catch {
+//      return null;
+//    }
+//  }
+
+function isSameOrigin(u) {
+   try { return new URL(u, window.location.origin).origin === window.location.origin; }
+   catch { return false; }
+ }
  async function safeFetchToDataURL(url) {
+   // 🚫 Skip converting cross-origin images in dev — prevents CORS errors in console
+   if (!isSameOrigin(url)) return null;
    try {
      const resp = await fetch(url, { mode: "cors", credentials: "include" });
      if (!resp.ok) return null;
@@ -91,8 +123,7 @@ const Login = () => {
      return await blobToDataURL(blob);
    } catch {
      return null;
-   }
- }
+   } }
  async function cacheAvatarForUser(user) {
    const userId = String(user?.user_id || user?.id || "");
    if (!userId) return user;
@@ -138,49 +169,98 @@ const Login = () => {
   };
 
   // Restore session on mount
-  useEffect(() => {
-    const token =
-      localStorage.getItem("TOKEN") || localStorage.getItem("ACCESS_TOKEN");
-    if (token) {
-      const tokenData = decodeJWT(token);
-      if (tokenData) {
-        dispatch(
-          setUserData({
-            id: tokenData.user_id,
-            user_id: tokenData.user_id,
-            username: tokenData.username,
-            email: tokenData.email,
-            phone_number: tokenData.phone_number,
-            has_access: tokenData.has_access,
-            is_client: tokenData.is_client,
-            superadmin: tokenData.superadmin,
-            is_manager: tokenData.is_manager,
-            accesses: tokenData.accesses,
-            org: tokenData.org,
-            company: tokenData.company,
-            entity: tokenData.entity,
-            role: tokenData.role,
-            roles: tokenData.roles,
-          })
-        );
-        // Set all roles for sidebar and display
-        localStorage.setItem(
-          "ROLE",
-          getDisplayRole(tokenData)
-        );
-        localStorage.setItem(
-          "ACCESSES",
-          JSON.stringify(tokenData.accesses || [])
-        );
-      }
- if (hasSecurityGuardRole(tokenData)) {
-   navigate("/guard/onboarding");
- } else {
-   navigate("/config");
- }
-           toast.success("You are already logged in!");
-    }
-  }, [navigate, dispatch]);
+  // Restore session on mount (paste this whole effect)
+useEffect(() => {
+  const token =
+    localStorage.getItem("ACCESS_TOKEN") ||
+    localStorage.getItem("TOKEN") ||
+    localStorage.getItem("token");
+  if (!token) return;
+
+  const tokenData = decodeJWT(token);
+  if (!tokenData) return;
+
+  // Build a user object straight from JWT (includes photo/profile_image we put in the token)
+  const userFromJWT = {
+    id: tokenData.user_id,
+    user_id: tokenData.user_id,
+    username: tokenData.username,
+    email: tokenData.email,
+    phone_number: tokenData.phone_number,
+    has_access: tokenData.has_access,
+    is_client: tokenData.is_client,
+    superadmin: tokenData.superadmin,
+    is_manager: tokenData.is_manager,
+    accesses: tokenData.accesses || [],
+    org: tokenData.org,
+    company: tokenData.company,
+    entity: tokenData.entity,
+    role: tokenData.role,
+    roles: tokenData.roles,
+    // <- use photo/profile_image from JWT if present
+    profile_image: tokenData.profile_image || tokenData.photo || null,
+    photo:        tokenData.profile_image || tokenData.photo || null,
+  };
+
+  // Redux + localStorage
+  dispatch(setUserData(userFromJWT));
+  localStorage.setItem("ACCESSES", JSON.stringify(userFromJWT.accesses));
+  localStorage.setItem("ROLE", getDisplayRole(userFromJWT));
+
+  // Warm the avatar cache and make the URL absolute + cache-busted
+  cacheAvatarForUser(userFromJWT);
+
+  if (hasSecurityGuardRole(userFromJWT)) {
+    navigate("/guard/onboarding");
+  } else {
+    navigate("/config");
+  }
+  toast.success("You are already logged in!");
+}, [navigate, dispatch]);
+
+//   useEffect(() => {
+//     const token =
+//       localStorage.getItem("TOKEN") || localStorage.getItem("ACCESS_TOKEN");
+//     if (token) {
+//       const tokenData = decodeJWT(token);
+//       if (tokenData) {
+//         dispatch(
+//           setUserData({
+//             id: tokenData.user_id,
+//             user_id: tokenData.user_id,
+//             username: tokenData.username,
+//             email: tokenData.email,
+//             phone_number: tokenData.phone_number,
+//             has_access: tokenData.has_access,
+//             is_client: tokenData.is_client,
+//             superadmin: tokenData.superadmin,
+//             is_manager: tokenData.is_manager,
+//             accesses: tokenData.accesses,
+//             org: tokenData.org,
+//             company: tokenData.company,
+//             entity: tokenData.entity,
+//             role: tokenData.role,
+//             roles: tokenData.roles,
+//           })
+//         );
+//         // Set all roles for sidebar and display
+//         localStorage.setItem(
+//           "ROLE",
+//           getDisplayRole(tokenData)
+//         );
+//         localStorage.setItem(
+//           "ACCESSES",
+//           JSON.stringify(tokenData.accesses || [])
+//         );
+//       }
+//  if (hasSecurityGuardRole(tokenData)) {
+//    navigate("/guard/onboarding");
+//  } else {
+//    navigate("/config");
+//  }
+//            toast.success("You are already logged in!");
+//     }
+//   }, [navigate, dispatch]);
 
   // Field change handler
   const onChange = (e) => {
@@ -252,13 +332,28 @@ const Login = () => {
          } catch {}
         }
 
-      if (userData) {
-  // cache avatar URL (+ cache-bust) and a base64 fallback, then persist USER_DATA
-  userData = await cacheAvatarForUser(userData);
+//       if (userData) {
+//   // cache avatar URL (+ cache-bust) and a base64 fallback, then persist USER_DATA
+//   userData = await cacheAvatarForUser(userData);
 
+//   dispatch(setUserData(userData));
+//   localStorage.setItem("ROLE", getDisplayRole(userData));
+// }
+// after you've set userData from API or tokenData (and after the getUserDetailsById fallback)
+if (userData) {
+  // ensure photo fields are present even if API payload didn’t include them
+  if (tokenData) {
+    const fromJWT = tokenData.profile_image || tokenData.photo || null;
+    if (fromJWT && !userData.profile_image) userData.profile_image = fromJWT;
+    if (fromJWT && !userData.photo)         userData.photo = fromJWT;
+  }
+
+  // now cache + persist + dispatch
+  userData = await cacheAvatarForUser(userData);
   dispatch(setUserData(userData));
   localStorage.setItem("ROLE", getDisplayRole(userData));
 }
+
 
         toast.success("Logged in successfully!");
         if (hasSecurityGuardRole(userData || tokenData)) {

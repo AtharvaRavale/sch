@@ -2311,6 +2311,7 @@ import { getUserDetailsById } from "../api";
 import React, { useEffect, useRef, useState } from "react";
 import { IoMdArrowDropdown } from "react-icons/io";
 import { ensureSlash } from "../utils/http";
+import { setLoggingOut } from "../api/axiosInstance"; // adjust path if needed
 
 import {
   FiMail,
@@ -2632,16 +2633,52 @@ function Profile({ onClose }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
+  const handleSignOut = async () => {
+  setLoggingOut(true);
 
-  const handleSignOut = () => {
-    localStorage.removeItem("ACCESS_TOKEN");
-    localStorage.removeItem("REFRESH_TOKEN");
-    localStorage.removeItem("USER_DATA");
-    localStorage.removeItem("ACCESSES");
-    localStorage.removeItem("ROLE");
-    navigate("/login");
-    if (typeof onClose === "function") onClose();
-  };
+  // stop redux-persist writing back (if you use it)
+  // try { persistor.pause(); } catch {}
+
+  // remove auth & cached data
+  const keys = [
+    "ACCESS_TOKEN",
+    "REFRESH_TOKEN",
+    "token",            // <- you still have this in storage
+    "access",
+    "USER_DATA",
+    "ACCESSES",
+    "ROLE",
+    "persist:root"      // <- redux-persist cache
+  ];
+  keys.forEach(k => localStorage.removeItem(k));
+
+  // remove avatar caches
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("USER_AVATAR_URL_") || k.startsWith("USER_AVATAR_DATAURL_"))
+    .forEach(k => localStorage.removeItem(k));
+
+  // now hard navigate so no React effects run
+  window.location.assign("/login");
+};
+// const handleSignOut = () => {
+//   setLoggingOut(true); // <- tells interceptors to skip token + no refresh
+//   localStorage.removeItem("ACCESS_TOKEN");
+//   localStorage.removeItem("REFRESH_TOKEN");
+//   localStorage.removeItem("USER_DATA");
+//   localStorage.removeItem("ACCESSES");
+//   localStorage.removeItem("ROLE");
+//   window.location.replace("/login"); // hard redirect to stop in-flight calls
+// };
+
+  // const handleSignOut = () => {
+  //   localStorage.removeItem("ACCESS_TOKEN");
+  //   localStorage.removeItem("REFRESH_TOKEN");
+  //   localStorage.removeItem("USER_DATA");
+  //   localStorage.removeItem("ACCESSES");
+  //   localStorage.removeItem("ROLE");
+  //   navigate("/login");
+  //   if (typeof onClose === "function") onClose();
+  // };
 
   const isValidString = (value) => value && String(value).trim() !== "";
   const hasContactData = () =>
@@ -3061,6 +3098,7 @@ function Profile({ onClose }) {
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              capture="user"
               className="hidden"
               onChange={handlePhotoSelected}
             />

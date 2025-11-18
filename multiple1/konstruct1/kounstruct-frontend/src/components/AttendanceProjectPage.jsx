@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Copy, Download, RefreshCw, Search, CalendarDays, Users, ShieldCheck, CheckCircle2, XCircle, ChevronDown, ChevronRight, Building2 } from "lucide-react";
-
+import { Allprojects, getProjectsByOwnership } from "../api";
 // --- Small helpers ----------------------------------------------------------
 function getActiveProjectId() {
   try {
@@ -8,10 +8,8 @@ function getActiveProjectId() {
     const q = urlParams.get("project_id");
     if (q) return Number(q);
   } catch {}
-  const ls =
-    localStorage.getItem("ACTIVE_PROJECT_ID") ||
-    localStorage.getItem("PROJECT_ID");
-  return ls ? Number(ls) : "";
+  const ls = localStorage.getItem("ACTIVE_PROJECT_ID") || localStorage.getItem("PROJECT_ID");
+  return ls ? Number(ls) : null;
 }
 
 function getAuthToken() {
@@ -121,7 +119,7 @@ export default function AttendanceProjectPage() {
   // Project info state
   const [projectInfo, setProjectInfo] = useState(null);
   const [projectsCache, setProjectsCache] = useState({});
-  const [availableProjects, setAvailableProjects] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
 
   const API_BASE = "https://konstruct.world/users";
@@ -133,6 +131,26 @@ export default function AttendanceProjectPage() {
   const borderColor = ORANGE;
   const textColor = theme === "dark" ? "#fff" : "#222";
   const iconColor = ORANGE;
+    const setActiveProject = (idOrEmpty) => {
+    const id = idOrEmpty ? Number(idOrEmpty) : null;
+    setProjectId(id);
+    if (id) {
+      const p = projects.find((x) => Number(x.id) === id);
+      if (p) setProjectInfo((prev) => ({ ...(prev || {}), ...p }));
+    }
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("project_id", String(id));
+    else url.searchParams.delete("project_id");
+    window.history.replaceState({}, "", url.toString());
+    if (id) {
+      localStorage.setItem("ACTIVE_PROJECT_ID", String(id));
+      localStorage.setItem("PROJECT_ID", String(id));
+    } else {
+      localStorage.removeItem("ACTIVE_PROJECT_ID");
+            localStorage.removeItem("PROJECT_ID");
+    }
+  };
+
 
   const queryUrl = useMemo(() => {
     if (!projectId) return "";
@@ -149,51 +167,60 @@ export default function AttendanceProjectPage() {
   }, [API_BASE, projectId, selectedRoles, date, searchDebounced, includeToday, uid, page, pageSize]);
 
   // Fetch available projects from user's accesses
-  async function fetchAvailableProjects() {
-    setLoadingProjects(true);
+  async function loadProjects() {
     try {
-      // Get user's accesses from localStorage
-      const accessString = localStorage.getItem("ACCESSES");
-      if (!accessString || accessString === "undefined") {
-        setLoadingProjects(false);
-        return;
+      setLoadingProjects(true);
+      const role = (localStorage.getItem("ROLE") || "").toLowerCase();
+      const userStr = localStorage.getItem("USER_DATA");
+      const user = userStr && userStr !== "undefined" ? JSON.parse(userStr) : null;
+
+      let resp = null;
+      if (role === "super admin") {
+        // all projects for super admin
+        resp = await Allprojects();
+      } else if (role === "manager" || role === "admin") {
+        // org-level projects
+        const orgId = user?.org || user?.organization_id || Number(localStorage.getItem("ORGANIZATION_ID"));
+        if (!orgId) {
+          setProjects([]);
+          return;
+        }
+        resp = await getProjectsByOwnership({
+          organization_id: orgId,
+          company_id: null,
+          entity_id: null,
+        });
+      } else if (user) {
+        // fallback: prefer org, else company, else entity
+        const orgId = user?.org || user?.organization_id || null;
+        const companyId = orgId ? null : (user?.company_id || null);
+        const entityId = (orgId || companyId) ? null : (user?.entity_id || null);
+        resp = await getProjectsByOwnership({
+          organization_id: orgId,
+          company_id: companyId,
+          entity_id: entityId,
+        });
       }
 
-      const accesses = JSON.parse(accessString);
-      if (!Array.isArray(accesses) || accesses.length === 0) {
-        setLoadingProjects(false);
-        return;
+      const list = Array.isArray(resp?.data)
+        ? resp.data
+        : Array.isArray(resp?.data?.results)
+        ? resp.data.results
+        : (resp?.data || []);
+
+      setProjects(list || []);
+
+      // auto-select only if exactly one project is available
+      if (!projectId && Array.isArray(list) && list.length === 1) {
+        setActiveProject(list[0].id);
       }
-
-      // Extract unique project IDs from accesses
-      const projectIds = [...new Set(accesses.map(a => a.project_id).filter(Boolean))];
-      
-      // Fetch details for each project
-      const token = getAuthToken();
-      const projectPromises = projectIds.map(id =>
-        fetch(`${PROJECTS_API}/${id}/`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        })
-        .then(res => res.ok ? res.json() : null)
-        .catch(() => null)
-      );
-
-      const projects = (await Promise.all(projectPromises)).filter(Boolean);
-      setAvailableProjects(projects);
-      
-      // Cache all projects
-      const cache = {};
-      projects.forEach(p => {
-        cache[p.id] = p;
-      });
-      setProjectsCache(cache);
     } catch (e) {
-      console.error("Failed to fetch projects:", e);
+      console.error("[Attendance] loadProjects failed", e);
+      setProjects([]);
     } finally {
       setLoadingProjects(false);
     }
   }
-
   // Fetch project info
   async function fetchProjectInfo(pid) {
     if (!pid) return;
@@ -238,9 +265,27 @@ export default function AttendanceProjectPage() {
       setLoading(false);
     }
   }
+  useEffect(() => {
+    if (!projects.length) return;
+    if (!projectId && projects.length === 1) {
+      setActiveProject(projects[0].id);
+      return;
+    }
+    // If saved/URL id is not in the new list, correct it
+    if (projectId && !projects.some((p) => Number(p.id) === Number(projectId))) {
+      setActiveProject(projects[0].id);
+    }
+  }, [projects, projectId]);
+  // useEffect(() => {
+  //   if (!projectId && projects.length === 1) {
+  //     setActiveProject(projects[0].id);
+  //   }
+  // }, [projects]); // run when the list arrives
+
 
   useEffect(() => {
-    fetchAvailableProjects();
+    loadProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -262,6 +307,11 @@ export default function AttendanceProjectPage() {
     setSelectedRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     );
+  }
+  
+
+  function handleProjectChange(e) {
+    setActiveProject(e.target.value);
   }
 
   async function copyUrl() {
@@ -359,6 +409,25 @@ export default function AttendanceProjectPage() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <select
+            value={projectId ?? ""}
+            onChange={(e) => setActiveProject(e.target.value)}
+            className="rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none"
+            style={{ background: "#fff", color: "#9c670d", border: `1.5px solid ${borderColor}` }}
+          >
+            <option value="" disabled>
+              {loadingProjects
+                ? "Loading…"
+                : projects.length
+                  ? "Select a project"
+                  : "No projects found"}
+            </option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name || `Project ${p.id}`}
+              </option>
+            ))}
+          </select>
               <button 
                 onClick={fetchData} 
                 className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:shadow-md"
@@ -387,6 +456,35 @@ export default function AttendanceProjectPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Project Dropdown */}
+            {/* Project Dropdown */}
+<label className="block">
+  <span
+    className="text-xs font-semibold mb-1.5 flex items-center gap-1.5 block"
+    style={{ color: theme === "dark" ? "#bfa672" : "#9c670d" }}
+  >
+    Project (Manager-assigned)
+  </span>
+  <select
+    value={projectId ?? ""}
+    onChange={(e) => setActiveProject(e.target.value)}
+    className="w-full rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 transition-all"
+    style={{ border: `1.5px solid ${borderColor}`, background: "#fff", color: textColor }}
+  >
+    <option value="" disabled>
+      {loadingProjects
+        ? "Loading…"
+        : projects.length
+          ? "Select a project"
+          : "No projects found"}
+    </option>
+{projects.map((p) => (
+        <option key={p.id} value={p.id}>
+        {p.name || `Project ${p.id}`}
+      </option>
+    ))}
+  </select>
+</label>
+
             
 
             {/* Date */}
@@ -529,7 +627,7 @@ export default function AttendanceProjectPage() {
                 No Project Selected
               </h3>
               <p className="text-sm font-medium mb-6" style={{ color: theme === "dark" ? "#bfa672" : "#9c670d" }}>
-                {availableProjects.length === 0 && !loadingProjects
+{projects.length === 0 && !loadingProjects
                   ? "You don't have access to any projects yet."
                   : "Please select a project from the dropdown above to view attendance records."}
               </p>
